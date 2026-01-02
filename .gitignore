@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+vendor/bird/node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Environment and secrets
+.env
+.env.*
+docker-cookies.env
+cookies.txt
+
+# Data
+data/
+*.db
+*.sqlite
+
+# Logs
+*.log
+npm-debug.log*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Test
+coverage/
+.nyc_output/
+
+# Misc
+*.tgz
+.cache/
+*.vtt
+
+# Junk
+-
+/bird/
+
+# Vendor
+vendor/bird/.git/
+vendor/bird/node_modules/
+vendor/bird/dist/
+vendor/bird/bird
+
+# Binary
+bin/bird

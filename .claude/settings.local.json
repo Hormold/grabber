@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bird:*)",
+      "Bash(source ~/.nvm/nvm.sh)",
+      "Bash(nvm use:*)",
+      "Bash(npx @steipete/bird:*)",
+      "Bash(pnpm run typecheck:*)",
+      "Bash(pnpm test:run:*)",
+      "Bash(pnpm run build:dist:*)",
+      "Bash(BIRD_DEBUG_MEDIA=1 node dist/cli.js:*)",
+      "Bash(BIRD_DEBUG_MEDIA=1 bird read:*)",
+      "Bash(pnpm run build:binary:*)",
+      "Bash(pnpm run build:*)",
+      "Bash(./bin/bird bookmarks:*)",
+      "Bash(./bin/bird check:*)",
+      "Bash(pnpm install:*)"
+    ]
+  },
+  "disableAllHooks": true
+}

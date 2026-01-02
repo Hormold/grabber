@@ -1,0 +1,212 @@
+diff --git a/package.json b/package.json
+index 8d79c96..3b07fee 100644
+--- a/package.json
++++ b/package.json
+@@ -51,5 +51,8 @@
+   },
+   "engines": {
+     "node": ">=22"
++  },
++  "patchedDependencies": {
++    "@steipete/sweet-cookie@0.1.0": "patches/@steipete__sweet-cookie.patch"
+   }
+ }
+diff --git a/src/cli/program.ts b/src/cli/program.ts
+index e0101d1..eaf03cd 100644
+--- a/src/cli/program.ts
++++ b/src/cli/program.ts
+@@ -1,6 +1,7 @@
+ import { Command } from 'commander';
+ import { registerBookmarksCommand } from '../commands/bookmarks.js';
+ import { registerCheckCommand } from '../commands/check.js';
++import { registerDumpCookiesCommand } from '../commands/dump-cookies.js';
+ import { registerHelpCommand } from '../commands/help.js';
+ import { registerPostCommands } from '../commands/post.js';
+ import { registerQueryIdsCommand } from '../commands/query-ids.js';
+@@ -26,6 +27,7 @@ export const KNOWN_COMMANDS = new Set([
+   'help',
+   'whoami',
+   'check',
++  'dump-cookies',
+ ]);
+ 
+ export function createProgram(ctx: CliContext): Command {
+@@ -124,6 +126,7 @@ export function createProgram(ctx: CliContext): Command {
+   registerBookmarksCommand(program, ctx);
+   registerUserCommands(program, ctx);
+   registerCheckCommand(program, ctx);
++  registerDumpCookiesCommand(program, ctx);
+ 
+   return program;
+ }
+diff --git a/src/lib/twitter-client-types.ts b/src/lib/twitter-client-types.ts
+index 52fe7ed..37215f0 100644
+--- a/src/lib/twitter-client-types.ts
++++ b/src/lib/twitter-client-types.ts
+@@ -1,5 +1,28 @@
+ import type { TwitterCookies } from './cookies.js';
+ 
++// Raw media entity from Twitter API
++export interface GraphqlMediaEntity {
++  id_str?: string;
++  media_url_https?: string;
++  type?: 'photo' | 'video' | 'animated_gif';
++  url?: string;
++  expanded_url?: string;
++  sizes?: {
++    thumb?: { w: number; h: number; resize: string };
++    small?: { w: number; h: number; resize: string };
++    medium?: { w: number; h: number; resize: string };
++    large?: { w: number; h: number; resize: string };
++  };
++  video_info?: {
++    duration_millis?: number;
++    variants?: Array<{
++      bitrate?: number;
++      content_type?: string;
++      url?: string;
++    }>;
++  };
++}
++
+ export type GraphqlTweetResult = {
+   __typename?: string;
+   rest_id?: string;
+@@ -11,6 +34,12 @@ export type GraphqlTweetResult = {
+     favorite_count?: number;
+     conversation_id_str?: string;
+     in_reply_to_status_id_str?: string | null;
++    entities?: {
++      media?: GraphqlMediaEntity[];
++    };
++    extended_entities?: {
++      media?: GraphqlMediaEntity[];
++    };
+   };
+   core?: {
+     user_results?: {
+@@ -168,6 +197,18 @@ export interface UploadMediaResult {
+   error?: string;
+ }
+ 
++// Parsed media item for output
++export interface TweetMedia {
++  type: 'photo' | 'video' | 'animated_gif';
++  url: string;
++  previewUrl?: string;
++  width?: number;
++  height?: number;
++  // For video/animated_gif: best quality video URL
++  videoUrl?: string;
++  durationMs?: number;
++}
++
+ export interface TweetData {
+   id: string;
+   text: string;
+@@ -184,6 +225,8 @@ export interface TweetData {
+   inReplyToStatusId?: string;
+   // Optional quoted tweet; depth controlled by quoteDepth (default: 1).
+   quotedTweet?: TweetData;
++  // Media attachments (photos, videos, GIFs)
++  media?: TweetMedia[];
+ }
+ 
+ export interface GetTweetResult {
+diff --git a/src/lib/twitter-client-utils.ts b/src/lib/twitter-client-utils.ts
+index 4654538..7b884a5 100644
+--- a/src/lib/twitter-client-utils.ts
++++ b/src/lib/twitter-client-utils.ts
+@@ -1,4 +1,4 @@
+-import type { GraphqlTweetResult, TweetData, TwitterUser } from './twitter-client-types.js';
++import type { GraphqlMediaEntity, GraphqlTweetResult, TweetData, TweetMedia, TwitterUser } from './twitter-client-types.js';
+ 
+ export function normalizeQuoteDepth(value?: number): number {
+   if (value === undefined || value === null) {
+@@ -153,6 +153,64 @@ export function extractTweetText(result: GraphqlTweetResult | undefined): string
+   return extractArticleText(result) ?? extractNoteTweetText(result) ?? firstText(result?.legacy?.full_text);
+ }
+ 
++export function extractMedia(result: GraphqlTweetResult | undefined): TweetMedia[] | undefined {
++  // Prefer extended_entities (has video info), fall back to entities
++  const rawMedia = result?.legacy?.extended_entities?.media ?? result?.legacy?.entities?.media;
++  if (!rawMedia || rawMedia.length === 0) {
++    return undefined;
++  }
++
++  const media: TweetMedia[] = [];
++
++  for (const item of rawMedia) {
++    if (!item.type || !item.media_url_https) {
++      continue;
++    }
++
++    const mediaItem: TweetMedia = {
++      type: item.type,
++      url: item.media_url_https,
++    };
++
++    // Get dimensions from largest available size
++    const sizes = item.sizes;
++    if (sizes?.large) {
++      mediaItem.width = sizes.large.w;
++      mediaItem.height = sizes.large.h;
++    } else if (sizes?.medium) {
++      mediaItem.width = sizes.medium.w;
++      mediaItem.height = sizes.medium.h;
++    }
++
++    // For thumbnails/previews
++    if (sizes?.small) {
++      mediaItem.previewUrl = `${item.media_url_https}:small`;
++    }
++
++    // Extract video URL for video/animated_gif
++    if ((item.type === 'video' || item.type === 'animated_gif') && item.video_info?.variants) {
++      // Find highest bitrate mp4 variant
++      const mp4Variants = item.video_info.variants
++        .filter((v): v is { bitrate: number; content_type: string; url: string } =>
++          v.content_type === 'video/mp4' && typeof v.bitrate === 'number' && typeof v.url === 'string'
++        )
++        .sort((a, b) => b.bitrate - a.bitrate);
++
++      if (mp4Variants.length > 0) {
++        mediaItem.videoUrl = mp4Variants[0].url;
++      }
++
++      if (item.video_info.duration_millis) {
++        mediaItem.durationMs = item.video_info.duration_millis;
++      }
++    }
++
++    media.push(mediaItem);
++  }
++
++  return media.length > 0 ? media : undefined;
++}
++
+ export function unwrapTweetResult(result: GraphqlTweetResult | undefined): GraphqlTweetResult | undefined {
+   if (!result) {
+     return undefined;
+@@ -187,6 +245,13 @@ export function mapTweetResult(result: GraphqlTweetResult | undefined, quoteDept
+     }
+   }
+ 
++  const media = extractMedia(result);
++
++  // Debug: log raw legacy to see media structure
++  if (process.env.BIRD_DEBUG_MEDIA === '1') {
++    console.error('[bird][debug][media] legacy:', JSON.stringify(result.legacy, null, 2));
++  }
++
+   return {
+     id: result.rest_id,
+     text,
+@@ -202,6 +267,7 @@ export function mapTweetResult(result: GraphqlTweetResult | undefined, quoteDept
+     },
+     authorId: userId,
+     quotedTweet,
++    media,
+   };
+ }
+ 
