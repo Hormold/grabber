@@ -9,6 +9,7 @@ export const CategorySchema = z.enum([
   'article',
   'tool',
   'project',
+  'fun',
 ]);
 
 export type Category = z.infer<typeof CategorySchema>;

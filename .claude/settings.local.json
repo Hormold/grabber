@@ -14,7 +14,13 @@
       "Bash(pnpm run build:*)",
       "Bash(./bin/bird bookmarks:*)",
       "Bash(./bin/bird check:*)",
-      "Bash(pnpm install:*)"
+      "Bash(pnpm install:*)",
+      "Bash(source docker-cookies.env)",
+      "Bash(system_profiler:*)",
+      "Bash(docker run:*)",
+      "Bash(tee:*)",
+      "Bash(grep:*)",
+      "Bash(git status:*)"
     ]
   },
   "disableAllHooks": true

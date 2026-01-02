@@ -52,7 +52,7 @@ LOW relevance: Non-technical, marketing fluff, generic advice, languages other t
 
 // Phase 2: Final analysis with enriched context
 const AnalysisSchema = z.object({
-  category: z.enum(['review', 'try', 'knowledge', 'podcast', 'video', 'article', 'tool', 'project']),
+  category: z.enum(['review', 'try', 'knowledge', 'podcast', 'video', 'article', 'tool', 'project', 'fun']),
 
   topic: z.string()
     .describe('Short scannable title - noun phrase, ~50 chars. Examples: "Claude Code Review Plugin", "React 19 Suspense Patterns"'),
@@ -404,7 +404,8 @@ Categories:
 - video: Video content
 - article: Long-form articles
 - tool: Dev tools, libraries, repos
-- project: Ideas, inspiration, case studies`);
+- project: Ideas, inspiration, case studies
+- fun: Memes, random photos, entertainment, non-technical content, jokes, personal posts NOT relevant to dev work`);
 
     return sections.join('\n\n---\n\n');
   }

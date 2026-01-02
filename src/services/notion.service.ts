@@ -71,6 +71,7 @@ export class NotionService {
                 { name: 'article', color: 'orange' },
                 { name: 'tool', color: 'pink' },
                 { name: 'project', color: 'gray' },
+                { name: 'fun', color: 'brown' },
               ],
             },
           },
