@@ -281,8 +281,11 @@ class Grabber {
     console.error(`[Grabber] Error${tweetId ? ` (tweet ${tweetId})` : ''}:`, grabberError.message);
 
     if (grabberError.code === 'AUTH_EXPIRED') {
-      this.authValid = false;
-      await this.telegram.notifyAuthExpired();
+      const { valid } = await this.bird.checkAuth();
+      if (!valid) {
+        this.authValid = false;
+        await this.telegram.notifyAuthExpired();
+      }
       return;
     }
 
