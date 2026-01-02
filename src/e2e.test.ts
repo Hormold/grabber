@@ -233,14 +233,14 @@ describe('E2E: Full bookmark processing cycle', () => {
       expect(username).toBe('testuser');
     });
 
-    it('should handle auth expired error', async () => {
+    it('should throw network error on failure (auth checked separately)', async () => {
       mockExec.mockImplementation((cmd, opts, callback) => {
         const cb = typeof opts === 'function' ? opts : callback;
-        cb?.(new Error('auth token expired 401'), '', 'auth expired');
+        cb?.(new Error('some network error'), '', '');
         return {} as any;
       });
 
-      await expect(bird.getBookmarks(10)).rejects.toThrow('auth expired');
+      await expect(bird.getBookmarks(10)).rejects.toThrow('Bird CLI error');
     });
 
     it('should handle rate limit error', async () => {

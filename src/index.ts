@@ -280,13 +280,13 @@ class Grabber {
 
     console.error(`[Grabber] Error${tweetId ? ` (tweet ${tweetId})` : ''}:`, grabberError.message);
 
-    if (grabberError.code === 'AUTH_EXPIRED') {
+    if (grabberError.code === 'NETWORK' || grabberError.code === 'UNKNOWN') {
       const { valid } = await this.bird.checkAuth();
       if (!valid) {
         this.authValid = false;
         await this.telegram.notifyAuthExpired();
+        return;
       }
-      return;
     }
 
     try {

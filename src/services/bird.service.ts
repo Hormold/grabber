@@ -58,14 +58,10 @@ export class BirdService {
   async getBookmarks(limit: number = 50): Promise<Tweet[]> {
     try {
       const authArgs = this.buildAuthArgs();
-      const { stdout, stderr } = await execAsync(
+      const { stdout } = await execAsync(
         `${this.birdCmd} bookmarks -n ${limit} --json --plain ${authArgs}`,
         { timeout: 120000, shell: '/bin/bash' }
       );
-
-      if (stderr && stderr.includes('auth') && stderr.includes('expired')) {
-        throw new GrabberError('Twitter auth expired', 'AUTH_EXPIRED', false);
-      }
 
       const parsed = JSON.parse(stdout);
       const tweets: Tweet[] = [];
@@ -98,21 +94,6 @@ export class BirdService {
           'UNKNOWN',
           false
         );
-      }
-
-      // Be specific about auth errors - avoid false positives
-      const lowerMsg = msg.toLowerCase();
-      const isAuthError = 
-        lowerMsg.includes('401') ||
-        lowerMsg.includes('403') ||
-        lowerMsg.includes('unauthorized') ||
-        lowerMsg.includes('authentication failed') ||
-        lowerMsg.includes('invalid credentials') ||
-        lowerMsg.includes('cookie') ||
-        (lowerMsg.includes('auth') && (lowerMsg.includes('expired') || lowerMsg.includes('invalid') || lowerMsg.includes('failed')));
-      
-      if (isAuthError) {
-        throw new GrabberError('Twitter auth expired or invalid', 'AUTH_EXPIRED', false);
       }
 
       throw new GrabberError(`Bird CLI error: ${msg}`, 'NETWORK', true);
