@@ -103,10 +103,16 @@ class Grabber {
           continue;
         }
 
+        if (!this.db.tryLock(tweet.id)) {
+          skipped++;
+          continue;
+        }
+
         try {
           await this.processTweet(tweet);
           processed++;
         } catch (error) {
+          this.db.releaseLock(tweet.id, 'failed');
           await this.handleError(error, tweet.id);
         }
 
@@ -137,9 +143,10 @@ class Grabber {
       this.db.markProcessed({
         tweetId: tweet.id,
         processedAt: new Date().toISOString(),
-        category: 'review', // Default for skipped
+        category: 'review',
         notionPageId: null,
         rawData: JSON.stringify({ tweet, triage, skipped: true }),
+        status: 'completed',
       });
       return;
     }
@@ -151,6 +158,20 @@ class Grabber {
 
     let notionPageId: string | null = null;
     try {
+      const existsInNotion = await this.notion.pageExists(tweet.id);
+      if (existsInNotion) {
+        console.log(`[Grabber] Skipping: already in Notion`);
+        this.db.markProcessed({
+          tweetId: tweet.id,
+          processedAt: new Date().toISOString(),
+          category: analysis.category,
+          notionPageId: null,
+          rawData: JSON.stringify({ tweet, triage, analysis, alreadyInNotion: true }),
+          status: 'completed',
+        });
+        return;
+      }
+      
       notionPageId = await this.notion.createPage(tweet, analysis);
       console.log(`[Grabber] Created Notion page: ${notionPageId}`);
     } catch (error) {
@@ -163,6 +184,7 @@ class Grabber {
       category: analysis.category,
       notionPageId,
       rawData: JSON.stringify({ tweet, triage, analysis }),
+      status: 'completed',
     });
   }
 

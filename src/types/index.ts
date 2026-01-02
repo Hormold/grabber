@@ -65,13 +65,17 @@ export const AnalysisResultSchema = z.object({
 
 export type AnalysisResult = z.infer<typeof AnalysisResultSchema>;
 
+export const ProcessingStatusSchema = z.enum(['processing', 'completed', 'failed']);
+export type ProcessingStatus = z.infer<typeof ProcessingStatusSchema>;
+
 export const BookmarkRecordSchema = z.object({
   id: z.number().optional(),
   tweetId: z.string(),
   processedAt: z.string(),
   category: CategorySchema,
   notionPageId: z.string().nullable(),
-  rawData: z.string(), // JSON stringified Tweet + AnalysisResult
+  rawData: z.string(),
+  status: ProcessingStatusSchema.optional(),
 });
 
 export type BookmarkRecord = z.infer<typeof BookmarkRecordSchema>;

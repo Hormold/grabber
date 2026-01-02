@@ -100,7 +100,18 @@ export class BirdService {
         );
       }
 
-      if (msg.includes('auth') || msg.includes('cookie') || msg.includes('401')) {
+      // Be specific about auth errors - avoid false positives
+      const lowerMsg = msg.toLowerCase();
+      const isAuthError = 
+        lowerMsg.includes('401') ||
+        lowerMsg.includes('403') ||
+        lowerMsg.includes('unauthorized') ||
+        lowerMsg.includes('authentication failed') ||
+        lowerMsg.includes('invalid credentials') ||
+        lowerMsg.includes('cookie') ||
+        (lowerMsg.includes('auth') && (lowerMsg.includes('expired') || lowerMsg.includes('invalid') || lowerMsg.includes('failed')));
+      
+      if (isAuthError) {
         throw new GrabberError('Twitter auth expired or invalid', 'AUTH_EXPIRED', false);
       }
 

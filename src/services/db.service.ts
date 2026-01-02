@@ -1,5 +1,5 @@
 import { Database } from 'bun:sqlite';
-import type { Category, BookmarkRecord, WeeklyStats } from '../types/index.js';
+import type { Category, BookmarkRecord, WeeklyStats, ProcessingStatus } from '../types/index.js';
 
 export class DbService {
   private db: Database;
@@ -18,30 +18,72 @@ export class DbService {
         processed_at TEXT NOT NULL,
         category TEXT NOT NULL,
         notion_page_id TEXT,
-        raw_data TEXT NOT NULL
+        raw_data TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'completed'
       );
       
       CREATE INDEX IF NOT EXISTS idx_bookmarks_tweet_id ON bookmarks(tweet_id);
       CREATE INDEX IF NOT EXISTS idx_bookmarks_processed_at ON bookmarks(processed_at);
       CREATE INDEX IF NOT EXISTS idx_bookmarks_category ON bookmarks(category);
+      CREATE INDEX IF NOT EXISTS idx_bookmarks_status ON bookmarks(status);
     `);
+    
+    this.migrateAddStatusColumn();
+  }
+
+  private migrateAddStatusColumn(): void {
+    const hasStatus = this.db.query(`PRAGMA table_info(bookmarks)`).all()
+      .some((col: { name: string }) => col.name === 'status');
+    
+    if (!hasStatus) {
+      this.db.exec(`ALTER TABLE bookmarks ADD COLUMN status TEXT NOT NULL DEFAULT 'completed'`);
+    }
   }
 
   isProcessed(tweetId: string): boolean {
-    const row = this.db.query('SELECT 1 FROM bookmarks WHERE tweet_id = ?').get(tweetId);
-    return !!row;
+    const row = this.db.query('SELECT status FROM bookmarks WHERE tweet_id = ?').get(tweetId) as { status: string | null } | null;
+    if (!row) return false;
+    return row.status === 'completed' || row.status === null;
+  }
+
+  isLocked(tweetId: string): boolean {
+    const row = this.db.query('SELECT status FROM bookmarks WHERE tweet_id = ?').get(tweetId) as { status: string | null } | null;
+    return row?.status === 'processing';
+  }
+
+  tryLock(tweetId: string): boolean {
+    const existing = this.db.query('SELECT status FROM bookmarks WHERE tweet_id = ?').get(tweetId) as { status: string | null } | null;
+    
+    if (existing) {
+      const status = existing.status;
+      if (status === 'completed' || status === 'processing' || status === null) {
+        return false;
+      }
+    }
+    
+    this.db.query(`
+      INSERT OR REPLACE INTO bookmarks (tweet_id, processed_at, category, notion_page_id, raw_data, status)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(tweetId, new Date().toISOString(), 'review', null, '{}', 'processing');
+    
+    return true;
+  }
+
+  releaseLock(tweetId: string, status: ProcessingStatus = 'failed'): void {
+    this.db.query(`UPDATE bookmarks SET status = ? WHERE tweet_id = ?`).run(status, tweetId);
   }
 
   markProcessed(record: Omit<BookmarkRecord, 'id'>): void {
     this.db.query(`
-      INSERT OR REPLACE INTO bookmarks (tweet_id, processed_at, category, notion_page_id, raw_data)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT OR REPLACE INTO bookmarks (tweet_id, processed_at, category, notion_page_id, raw_data, status)
+      VALUES (?, ?, ?, ?, ?, ?)
     `).run(
       record.tweetId,
       record.processedAt,
       record.category,
       record.notionPageId,
       record.rawData,
+      record.status ?? 'completed',
     );
   }
 

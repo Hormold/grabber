@@ -1,22 +1,31 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Tweet, AnalysisResult } from './types/index.js';
 
-// Mock bun:sqlite for vitest (runs on Node) - stateful mock
 const mockDbData: Map<string, any> = new Map();
 vi.mock('bun:sqlite', () => ({
   Database: vi.fn().mockImplementation(() => ({
     exec: vi.fn(),
     query: vi.fn().mockImplementation((sql: string) => ({
       get: vi.fn().mockImplementation((...args: any[]) => {
+        if (sql.includes('SELECT status FROM bookmarks WHERE tweet_id')) {
+          const row = mockDbData.get(args[0]);
+          return row ? { status: row.status ?? 'completed' } : null;
+        }
         if (sql.includes('SELECT 1 FROM bookmarks WHERE tweet_id')) {
           return mockDbData.has(args[0]) ? { '1': 1 } : null;
         }
         if (sql.includes('COUNT(*)')) {
           return { count: mockDbData.size };
         }
+        if (sql.includes('PRAGMA table_info')) {
+          return [{ name: 'status' }];
+        }
         return null;
       }),
       all: vi.fn().mockImplementation((...args: any[]) => {
+        if (sql.includes('PRAGMA table_info')) {
+          return [{ name: 'status' }];
+        }
         if (sql.includes('SELECT * FROM bookmarks') && sql.includes('processed_at >=')) {
           const dateFilter = args[0] as string;
           return Array.from(mockDbData.values()).filter(v => v.processed_at >= dateFilter);
@@ -32,6 +41,11 @@ vi.mock('bun:sqlite', () => ({
         return [];
       }),
       run: vi.fn().mockImplementation((...args: any[]) => {
+        if (sql.includes('UPDATE bookmarks SET status')) {
+          const row = mockDbData.get(args[1]);
+          if (row) row.status = args[0];
+          return;
+        }
         if (sql.includes('INSERT OR REPLACE')) {
           mockDbData.set(args[0], {
             id: mockDbData.size + 1,
@@ -40,6 +54,7 @@ vi.mock('bun:sqlite', () => ({
             category: args[2],
             notion_page_id: args[3],
             raw_data: args[4],
+            status: args[5] ?? 'completed',
           });
         }
       }),
@@ -758,11 +773,13 @@ describe('E2E: Full bookmark processing cycle', () => {
         urls: ['https://www.youtube.com/watch?v=abc123def45'],
       };
 
-      // Mock yt-dlp for transcript
       mockExec.mockImplementation((cmd, opts, callback) => {
         const cb = typeof opts === 'function' ? opts : callback;
-        if (String(cmd).includes('yt-dlp')) {
-          cb?.(null, 'This is the video transcript about AI tools', '');
+        const cmdStr = String(cmd);
+        if (cmdStr.includes('yt-dlp')) {
+          cb?.(null, '', '');
+        } else if (cmdStr.includes('cat') && cmdStr.includes('.vtt')) {
+          cb?.(null, 'WEBVTT\n\n00:00:00.000 --> 00:00:05.000\nThis is the video transcript about AI tools', '');
         } else {
           cb?.(null, '', '');
         }
