@@ -17,6 +17,9 @@ importers:
       '@notionhq/client':
         specifier: ^2.2.15
         version: 2.3.0
+      '@steipete/sweet-cookie':
+        specifier: ^0.1.0
+        version: 0.1.0
       ai:
         specifier: ^6.0.5
         version: 6.0.5(zod@3.25.76)
@@ -519,6 +522,10 @@ packages:
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
+
+  '@steipete/sweet-cookie@0.1.0':
+    resolution: {integrity: sha512-cF8hS6rTohAFI1NAm2/HM9omBlw6V1DpwF6q5e9FB+l274HjtyirCgCc6QK2Rtuh7uDoqWHshFQZPsceyJuVgw==}
+    engines: {node: '>=22'}
 
   '@types/estree@1.0.8':
     resolution: {integrity: sha512-dWHzHa2WqEXI/O1E9OjrocMTKJl2mSrEolh1Iomrv6U+JuNwaHXsXx9bLu5gG7BUWFIN0skIQJQ/L1rIex4X6w==}
@@ -1336,6 +1343,8 @@ snapshots:
     optional: true
 
   '@standard-schema/spec@1.1.0': {}
+
+  '@steipete/sweet-cookie@0.1.0': {}
 
   '@types/estree@1.0.8': {}
 
